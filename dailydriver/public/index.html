@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DailyDriver</title>
+
+  <style>
+    :root {
+      --bg: #0e0e0f;
+      --surface: #18181b;
+      --surface2: #222226;
+      --border: #2e2e34;
+      --accent: #f5c542;
+      --accent2: #ff6b35;
+      --text: #f0ede6;
+      --muted: #7a7a8a;
+      --done: #4ade80;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ── Noise overlay ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 999;
+      opacity: 0.4;
+    }
+
+    /* ── Pages ── */
+    .page { display: none; animation: fadeIn 0.3s ease; }
+    .page.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ── Auth Pages ── */
+    .auth-wrap {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .auth-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 48px 40px;
+      width: 100%;
+      max-width: 420px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .auth-box::before {
+      content: '';
+      position: absolute;
+      top: -60px; right: -60px;
+      width: 180px; height: 180px;
+      background: radial-gradient(circle, rgba(245,197,66,0.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .logo {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      margin-bottom: 8px;
+    }
+
+    .logo span { color: var(--accent); }
+
+    .auth-sub {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 36px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    input[type="text"], input[type="email"], input[type="password"], input[type="number"] {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      padding: 14px 16px;
+      outline: none;
+      transition: border-color 0.2s;
+      margin-bottom: 20px;
+    }
+
+    input:focus { border-color: var(--accent); }
+
+    .btn {
+      width: 100%;
+      padding: 15px;
+      background: var(--accent);
+      color: #000;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-weight: 800;
+      font-size: 15px;
+      letter-spacing: 0.5px;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: transform 0.15s, opacity 0.15s;
+    }
+
+    .btn:hover { transform: translateY(-1px); opacity: 0.9; }
+    .btn:active { transform: translateY(0); }
+
+    .btn-ghost {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .btn-sm {
+      width: auto;
+      padding: 8px 16px;
+      font-size: 13px;
+    }
+
+    .btn-danger {
+      background: transparent;
+      border: 1px solid #ff4444;
+      color: #ff4444;
+    }
+
+    .switch-link {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .switch-link a {
+      color: var(--accent);
+      cursor: pointer;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .error-msg {
+      background: rgba(255,68,68,0.1);
+      border: 1px solid rgba(255,68,68,0.3);
+      color: #ff6b6b;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    .success-msg {
+      background: rgba(74,222,128,0.1);
+      border: 1px solid rgba(74,222,128,0.3);
+      color: var(--done);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    /* ── App Shell ── */
+    .app-shell {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .navbar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .nav-logo { font-size: 22px; font-weight: 800; letter-spacing: -1px; }
+    .nav-logo span { color: var(--accent); }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .nav-user {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .nav-user strong { color: var(--text); }
+
+    .nav-tabs {
+      display: flex;
+      gap: 4px;
+    }
+
+    .nav-tab {
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      color: var(--muted);
+      transition: all 0.2s;
+      border: none;
+      background: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    .nav-tab:hover { color: var(--text); background: var(--surface2); }
+    .nav-tab.active { color: var(--accent); background: rgba(245,197,66,0.08); }
+
+    /* ── Main Content ── */
+    .main-content {
+      padding: 40px 32px;
+      max-width: 900px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin-bottom: 28px;
+    }
+
+    .section-title {
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .section-date {
+      color: var(--muted);
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+    }
+
+    /* ── Habit Cards ── */
+    .habits-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .habit-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      transition: border-color 0.2s, transform 0.15s;
+      cursor: pointer;
+    }
+
+    .habit-card:hover { border-color: var(--accent); transform: translateX(3px); }
+    .habit-card.done { border-color: rgba(74,222,128,0.3); }
+
+    .habit-check {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.2s;
+      font-size: 14px;
+    }
+
+    .habit-card.done .habit-check {
+      background: var(--done);
+      border-color: var(--done);
+      color: #000;
+    }
+
+    .habit-info { flex: 1; }
+
+    .habit-name {
+      font-size: 16px;
+      font-weight: 700;
+      transition: color 0.2s;
+    }
+
+    .habit-card.done .habit-name {
+      color: var(--done);
+      text-decoration: line-through;
+      text-decoration-color: rgba(74,222,128,0.4);
+    }
+
+    .habit-meta {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 3px;
+      font-family: 'Courier New', monospace;
+    }
+
+    .habit-status {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.5px;
+    }
+
+    .habit-status.done { background: rgba(74,222,128,0.1); color: var(--done); }
+    .habit-status.not-done { background: rgba(122,122,138,0.1); color: var(--muted); }
+
+    .delete-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 6px;
+      font-size: 16px;
+      transition: color 0.2s;
+      line-height: 1;
+    }
+
+    .delete-btn:hover { color: #ff4444; }
+
+    /* ── Empty State ── */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--muted);
+    }
+
+    .empty-icon { font-size: 48px; margin-bottom: 16px; }
+    .empty-title { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+    .empty-desc { font-size: 14px; line-height: 1.6; }
+
+    /* ── Add Habit Panel ── */
+    .add-panel {
+      background: var(--surface);
+      border: 1px solid var(--accent);
+      border-radius: 16px;
+      padding: 28px 28px 24px;
+      margin-bottom: 32px;
+      display: none;
+    }
+
+    .add-panel.open { display: block; animation: fadeIn 0.2s ease; }
+
+    .add-panel-title {
+      font-size: 18px;
+      font-weight: 800;
+      margin-bottom: 20px;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .form-group { display: flex; flex-direction: column; }
+
+    /* ── Stats bar ── */
+    .stats-bar {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      flex: 1;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -1px;
+    }
+
+    .stat-value.accent { color: var(--accent); }
+    .stat-value.green { color: var(--done); }
+
+    /* ── Progress bar ── */
+    .progress-bar-wrap {
+      background: var(--surface2);
+      border-radius: 99px;
+      height: 6px;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 99px;
+      transition: width 0.5s ease;
+    }
+
+    /* ── History Table ── */
+    .history-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .history-table th {
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+      padding: 0 16px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .history-table td {
+      padding: 14px 16px;
+      font-size: 14px;
+      border-bottom: 1px solid rgba(46,46,52,0.5);
+    }
+
+    .history-table tr:last-child td { border-bottom: none; }
+    .history-table tr:hover td { background: var(--surface2); }
+
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.5px;
+    }
+
+    .badge-done { background: rgba(74,222,128,0.1); color: var(--done); }
+    .badge-notdone { background: rgba(122,122,138,0.1); color: var(--muted); }
+
+    .history-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .filter-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .filter-btn {
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 700;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      transition: all 0.15s;
+    }
+
+    .filter-btn.active, .filter-btn:hover {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #000;
+    }
+
+    .logout-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .logout-btn:hover { border-color: #ff4444; color: #ff4444; }
+
+    @media (max-width: 600px) {
+      .navbar { padding: 0 16px; }
+      .main-content { padding: 24px 16px; }
+      .stats-bar { flex-direction: column; }
+      .form-row { grid-template-columns: 1fr; }
+      .nav-tabs { gap: 2px; }
+      .nav-tab { padding: 8px 12px; font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══ LOGIN PAGE ════════════════════════════════════════════════════════ -->
+<div id="page-login" class="page active">
+  <div class="auth-wrap">
+    <div class="auth-box">
+      <div class="logo">Daily<span>Driver</span></div>
+      <p class="auth-sub">Pantau kebiasaan harianmu, konsisten setiap hari.</p>
+      <div id="login-error" class="error-msg"></div>
+      <label for="login-email">Email</label>
+      <input type="email" id="login-email" placeholder="email@kamu.com" />
+      <label for="login-password">Password</label>
+      <input type="password" id="login-password" placeholder="••••••••" />
+      <button class="btn" onclick="doLogin()">Masuk →</button>
+      <div class="switch-link">
+        Belum punya akun? <a onclick="showPage('page-register')">Daftar di sini</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ REGISTER PAGE ════════════════════════════════════════════════════ -->
+<div id="page-register" class="page">
+  <div class="auth-wrap">
+    <div class="auth-box">
+      <div class="logo">Daily<span>Driver</span></div>
+      <p class="auth-sub">Buat akunmu dan mulai konsisten hari ini.</p>
+      <div id="reg-error" class="error-msg"></div>
+      <div id="reg-success" class="success-msg"></div>
+      <label for="reg-name">Nama</label>
+      <input type="text" id="reg-name" placeholder="Nama lengkapmu" />
+      <label for="reg-email">Email</label>
+      <input type="email" id="reg-email" placeholder="email@kamu.com" />
+      <label for="reg-password">Password</label>
+      <input type="password" id="reg-password" placeholder="Minimal 6 karakter" />
+      <button class="btn" onclick="doRegister()">Buat Akun →</button>
+      <div class="switch-link">
+        Sudah punya akun? <a onclick="showPage('page-login')">Masuk di sini</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ APP SHELL ══════════════════════════════════════════════════════════ -->
+<div id="page-app" class="page">
+  <div class="app-shell">
+    <!-- Navbar -->
+    <nav class="navbar">
+      <div class="nav-logo">Daily<span>Driver</span></div>
+      <div class="nav-tabs">
+        <button class="nav-tab active" id="tab-dashboard" onclick="switchTab('dashboard')">Dashboard</button>
+        <button class="nav-tab" id="tab-history" onclick="switchTab('history')">Riwayat</button>
+      </div>
+      <div class="nav-right">
+        <div class="nav-user">Halo, <strong id="nav-username">–</strong></div>
+        <button class="logout-btn" onclick="doLogout()">Keluar</button>
+      </div>
+    </nav>
+
+    <!-- Dashboard -->
+    <div class="main-content" id="tab-content-dashboard">
+      <div class="section-header">
+        <div>
+          <div class="section-title">Habit Hari Ini</div>
+          <div class="section-date" id="today-date"></div>
+        </div>
+        <button class="btn btn-sm" onclick="toggleAddPanel()">+ Tambah Habit</button>
+      </div>
+
+      <!-- Add habit panel -->
+      <div class="add-panel" id="add-panel">
+        <div class="add-panel-title">✦ Tambah Habit Baru</div>
+        <div id="add-error" class="error-msg"></div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="habit-name">Nama Habit</label>
+            <input type="text" id="habit-name" placeholder="cth: Baca buku 30 menit" />
+          </div>
+          <div class="form-group">
+            <label for="habit-target">Target/Hari</label>
+            <input type="number" id="habit-target" value="1" min="1" max="99" style="width:80px" />
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:4px;">
+          <button class="btn btn-sm" onclick="doAddHabit()">Simpan</button>
+          <button class="btn btn-sm btn-ghost" onclick="toggleAddPanel()">Batal</button>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-bar" id="stats-bar" style="display:none">
+        <div class="stat-card">
+          <div class="stat-label">Total Habit</div>
+          <div class="stat-value accent" id="stat-total">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Selesai Hari Ini</div>
+          <div class="stat-value green" id="stat-done">0</div>
+        </div>
+        <div class="stat-card" style="flex:2">
+          <div class="stat-label">Progress</div>
+          <div class="stat-value" id="stat-pct">0%</div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Habits list -->
+      <div class="habits-list" id="habits-list">
+        <div class="empty-state">
+          <div class="empty-icon">🚀</div>
+          <div class="empty-title">Belum ada habit</div>
+          <div class="empty-desc">Klik "+ Tambah Habit" untuk mulai mencatat kebiasaan harianmu.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- History -->
+    <div class="main-content" id="tab-content-history" style="display:none">
+      <div class="section-header">
+        <div class="section-title">Riwayat Habit</div>
+      </div>
+
+      <div class="filter-bar">
+        <button class="filter-btn active" onclick="filterHistory('all', this)">Semua</button>
+        <button class="filter-btn" onclick="filterHistory('done', this)">Done</button>
+        <button class="filter-btn" onclick="filterHistory('not done', this)">Not Done</button>
+      </div>
+
+      <div class="history-wrap">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Tanggal</th>
+              <th>Habit</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="history-tbody">
+            <tr><td colspan="3" style="text-align:center; color:var(--muted); padding:40px">Belum ada riwayat.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let allHistory = [];
+  let addPanelOpen = false;
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function showPage(id) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  function showMsg(id, msg) {
+    const el = document.getElementById(id);
+    el.textContent = msg;
+    el.style.display = 'block';
+    setTimeout(() => el.style.display = 'none', 4000);
+  }
+
+  function formatDate(iso) {
+    const d = new Date(iso + 'T00:00:00');
+    return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+  }
+
+  function todayISO() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  async function api(path, opts = {}) {
+    const res = await fetch(path, {
+      headers: { 'Content-Type': 'application/json' },
+      ...opts
+    });
+    return res.json();
+  }
+
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  async function doLogin() {
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-password').value;
+    const data = await api('/api/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password })
+    });
+    if (data.error) return showMsg('login-error', data.error);
+    document.getElementById('nav-username').textContent = data.name;
+    document.getElementById('login-email').value = '';
+    document.getElementById('login-password').value = '';
+    showPage('page-app');
+    loadDashboard();
+  }
+
+  async function doRegister() {
+    const name = document.getElementById('reg-name').value.trim();
+    const email = document.getElementById('reg-email').value.trim();
+    const password = document.getElementById('reg-password').value;
+    if (!name || !email || !password) return showMsg('reg-error', 'Semua field wajib diisi!');
+    const btn = document.querySelector('#page-register .btn');
+    btn.textContent = 'Memproses...';
+    btn.disabled = true;
+    try {
+      const data = await api('/api/register', {
+        method: 'POST',
+        body: JSON.stringify({ name, email, password })
+      });
+      if (data.error) { showMsg('reg-error', data.error); return; }
+      showMsg('reg-success', 'Akun berhasil dibuat! Silakan login.');
+      setTimeout(() => showPage('page-login'), 1500);
+    } catch(e) {
+      showMsg('reg-error', 'Koneksi gagal. Pastikan Terminal masih berjalan!');
+    } finally {
+      btn.textContent = 'Buat Akun →';
+      btn.disabled = false;
+    }
+  }
+
+  async function doLogout() {
+    await api('/api/logout', { method: 'POST' });
+    showPage('page-login');
+  }
+
+  // ── Dashboard ─────────────────────────────────────────────────────────────
+  async function loadDashboard() {
+    document.getElementById('today-date').textContent = new Date().toLocaleDateString('id-ID', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+    });
+
+    const habits = await api('/api/habits');
+    const list = document.getElementById('habits-list');
+    const statsBar = document.getElementById('stats-bar');
+
+    if (!habits.length) {
+      statsBar.style.display = 'none';
+      list.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">🚀</div>
+          <div class="empty-title">Belum ada habit</div>
+          <div class="empty-desc">Klik "+ Tambah Habit" untuk mulai mencatat kebiasaan harianmu.</div>
+        </div>`;
+      return;
+    }
+
+    statsBar.style.display = 'flex';
+    const doneCount = habits.filter(h => h.status === 'done').length;
+    const pct = Math.round((doneCount / habits.length) * 100);
+    document.getElementById('stat-total').textContent = habits.length;
+    document.getElementById('stat-done').textContent = doneCount;
+    document.getElementById('stat-pct').textContent = pct + '%';
+    document.getElementById('progress-fill').style.width = pct + '%';
+
+    list.innerHTML = habits.map(h => `
+      <div class="habit-card ${h.status === 'done' ? 'done' : ''}" id="hcard-${h.habitId}" onclick="toggleHabit(${h.habitId})">
+        <div class="habit-check">${h.status === 'done' ? '✓' : ''}</div>
+        <div class="habit-info">
+          <div class="habit-name">${escHtml(h.habitName)}</div>
+          <div class="habit-meta">Target: ${h.habitTarget}x/hari · Mulai: ${formatDate(h.habitStartDate)}</div>
+        </div>
+        <span class="habit-status ${h.status === 'done' ? 'done' : 'not-done'}">${h.status === 'done' ? 'DONE' : 'NOT DONE'}</span>
+        <button class="delete-btn" onclick="event.stopPropagation(); deleteHabit(${h.habitId})">✕</button>
+      </div>`).join('');
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  async function toggleHabit(habitId) {
+    await api(`/api/habits/${habitId}/toggle`, { method: 'POST' });
+    loadDashboard();
+  }
+
+  async function deleteHabit(habitId) {
+    if (!confirm('Hapus habit ini beserta seluruh riwayatnya?')) return;
+    await api(`/api/habits/${habitId}`, { method: 'DELETE' });
+    loadDashboard();
+  }
+
+  function toggleAddPanel() {
+    addPanelOpen = !addPanelOpen;
+    document.getElementById('add-panel').classList.toggle('open', addPanelOpen);
+    if (addPanelOpen) document.getElementById('habit-name').focus();
+  }
+
+  async function doAddHabit() {
+    const habitName = document.getElementById('habit-name').value.trim();
+    const habitTarget = parseInt(document.getElementById('habit-target').value) || 1;
+    if (!habitName) return showMsg('add-error', 'Nama habit tidak boleh kosong');
+    const data = await api('/api/habits', {
+      method: 'POST',
+      body: JSON.stringify({ habitName, habitTarget })
+    });
+    if (data.error) return showMsg('add-error', data.error);
+    document.getElementById('habit-name').value = '';
+    document.getElementById('habit-target').value = '1';
+    toggleAddPanel();
+    loadDashboard();
+  }
+
+  // ── Tabs ──────────────────────────────────────────────────────────────────
+  function switchTab(tab) {
+    document.getElementById('tab-content-dashboard').style.display = tab === 'dashboard' ? 'block' : 'none';
+    document.getElementById('tab-content-history').style.display = tab === 'history' ? 'block' : 'none';
+    document.getElementById('tab-dashboard').classList.toggle('active', tab === 'dashboard');
+    document.getElementById('tab-history').classList.toggle('active', tab === 'history');
+    if (tab === 'history') loadHistory();
+  }
+
+  // ── History ───────────────────────────────────────────────────────────────
+  async function loadHistory() {
+    allHistory = await api('/api/history');
+    renderHistory('all');
+  }
+
+  function filterHistory(filter, btn) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderHistory(filter);
+  }
+
+  function renderHistory(filter) {
+    const data = filter === 'all' ? allHistory : allHistory.filter(r => r.status === filter);
+    const tbody = document.getElementById('history-tbody');
+    if (!data.length) {
+      tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--muted); padding:40px">Belum ada riwayat.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = data.map(r => `
+      <tr>
+        <td style="font-family:'Space Mono',monospace; font-size:13px">${formatDate(r.logDate)}</td>
+        <td>${escHtml(r.habitName)}</td>
+        <td><span class="badge ${r.status === 'done' ? 'badge-done' : 'badge-notdone'}">${r.status === 'done' ? 'Done' : 'Not Done'}</span></td>
+      </tr>`).join('');
+  }
+
+  // ── Enter key support ─────────────────────────────────────────────────────
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      const active = document.querySelector('.page.active').id;
+      if (active === 'page-login') doLogin();
+      else if (active === 'page-register') doRegister();
+    }
+  });
+
+  // ── Auto-check session ────────────────────────────────────────────────────
+  (async () => {
+    const data = await api('/api/me');
+    if (!data.error) {
+      document.getElementById('nav-username').textContent = data.name;
+      showPage('page-app');
+      loadDashboard();
+    }
+  })();
+</script>
+</body>
+</html>
